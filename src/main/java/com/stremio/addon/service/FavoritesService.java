@@ -1,5 +1,9 @@
 package com.stremio.addon.service;
 
+import com.stremio.addon.controller.dto.MovieDto;
+import com.stremio.addon.controller.dto.SeasonDetailDto;
+import com.stremio.addon.controller.dto.SeriesDetailDto;
+import com.stremio.addon.controller.dto.SeriesDto;
 import com.stremio.addon.service.tmdb.TmdbService;
 import com.stremio.addon.service.tmdb.dto.Movie;
 import com.stremio.addon.service.tmdb.dto.TvShow;
@@ -81,7 +85,7 @@ public class FavoritesService {
 
         try {
             Optional.ofNullable(tmdbService.getTvShowDetail((int) mediaId))
-                    .map(TvShowDetail::getSeasons)
+                    .map(SeriesDetailDto::getSeasons)
                     .ifPresentOrElse(
                             seasons -> processSeasons(seasons, imdbId),
                             () -> log.warn("No seasons found for TV show with IMDb ID {}", imdbId)
@@ -98,7 +102,7 @@ public class FavoritesService {
      * @param seasons List of seasons of the TV show.
      * @param imdbId  The IMDb ID of the TV show.
      */
-    private void processSeasons(List<TvShowDetail.Season> seasons, String imdbId) {
+    private void processSeasons(List<SeasonDetailDto> seasons, String imdbId) {
         seasons.forEach(season -> {
             int seasonNumber = season.getSeasonNumber();
             log.info("Processing Season {} for TV show with IMDb ID {}", seasonNumber, imdbId);
@@ -113,7 +117,7 @@ public class FavoritesService {
      * @param imdbId       The IMDb ID of the TV show.
      * @param seasonNumber The season number.
      */
-    private void processEpisodes(TvShowDetail.Season season, String imdbId, int seasonNumber) {
+    private void processEpisodes(SeasonDetailDto season, String imdbId, int seasonNumber) {
         Optional.of(season.getEpisodeCount())
                 .ifPresentOrElse(
                         episodeCount -> saveAllEpisodes(imdbId, seasonNumber, episodeCount),
@@ -185,7 +189,8 @@ public class FavoritesService {
      * It processes favorite movies and TV shows by fetching them from the TMDB service
      * based on their popularity.
      */
-    @Scheduled(fixedRate = 3600000) // Ejecutar cada hora
+    
+    //@Scheduled(fixedRate = 3600000) // Ejecutar cada hora
     public void verifyAndSaveFavorites() {
         log.info("Starting favorite verification...");
 
@@ -225,9 +230,9 @@ public class FavoritesService {
 
             results.forEach(item -> {
                 long mediaId;
-                if (item instanceof Movie movie) {
+                if (item instanceof MovieDto movie) {
                     mediaId = movie.getId();
-                } else if (item instanceof TvShow tvShow) {
+                } else if (item instanceof SeriesDto tvShow) {
                     mediaId = tvShow.getId();
                 } else {
                     throw new IllegalArgumentException("Unsupported media type");

@@ -431,3 +431,94 @@ button[data-bs-target="#providersModal"]:hover {
     max-width: 150px;
     height: auto;
 }
+
+
+.media-details {
+    display: flex;
+    flex-direction: row;
+    background-color: #570024;
+    color: white;
+    padding: 20px;
+    border-radius: 10px;
+    gap: 20px;
+}
+
+.media-poster img {
+    max-width: 200px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.media-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.media-title {
+    font-size: 2rem;
+    margin: 0;
+}
+
+.media-year {
+    font-size: 1.2rem;
+    color: #f3cfcf;
+}
+
+.media-genres {
+    margin-top: 10px;
+    font-style: italic;
+    color: #d3b5b5;
+}
+
+.media-score {
+    display: flex;
+    align-items: center;
+    margin-top: 15px;
+}
+
+.score-circle {
+    background-color: #2c8602;
+    border-radius: 50%;
+    color: white;
+    font-weight: bold;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 50px;
+    height: 50px;
+    font-size: 1.2rem;
+    margin-right: 10px;
+}
+
+.score-label {
+    font-size: 1rem;
+    color: #f3cfcf;
+}
+
+.media-overview {
+    margin-top: 20px;
+    font-size: 1rem;
+    line-height: 1.5;
+}
+
+.media-footer {
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.btn-media {
+    background-color: #8b0000;
+    border: none;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.btn-media:hover {
+    background-color: #a00000;
+}

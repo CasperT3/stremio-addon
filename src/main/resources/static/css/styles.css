@@ -67,3 +67,18 @@ h1 {
     background-color: #fbbf24;
     color: #fff;
 }
+
+.progress {
+    height: 20px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    background-color: #e9ecef;
+    border-radius: 5px;
+}
+
+.progress-bar {
+    transition: width 0.4s ease;
+}

@@ -1,7 +1,7 @@
 // Constants and Configurations
 const API_BASE_URL = 'http://localhost:7010/api/tmdb';
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
-const DEFAULT_IMAGE = 'https://via.placeholder.com/220x330?text=No+Image';
+const DEFAULT_IMAGE = 'https://dummyimage.com/220x330/cccccc/000000&text=No+Image';
 
 // Cache DOM elements
 const domElements = {
@@ -77,7 +77,7 @@ const utils = {
 // API Service
 const apiService = {
     async fetch(endpoint, options = {}) {
-        const url = utils.createUrl(API_BASE_URL, endpoint);
+        const url = utils.createUrl(API_BASE_URL, endpoint)
         console.log(`[fetch] Fetching data from URL: ${url}`);
         const response = await fetch(url);
         if (!response.ok) {
@@ -97,7 +97,7 @@ const apiService = {
         });
     }
 };
-
+// Funcion que sume 2 numeros
 // Content Service
 const contentService = {
     init() {
@@ -172,12 +172,12 @@ const contentService = {
     createCards(item, type) {
         const popularity = Math.round((item.vote_average || 0) * 10);
         const isFavorite = type === 'movies'
-            ? appState.state.favorites.movies.has(item.id)
-            : appState.state.favorites.series.has(item.id);
+        ? appState.state.favorites.movies.has(item.id)
+        : appState.state.favorites.series.has(item.id);
         const posterPath = item.poster_path
-            ? `${IMAGE_BASE_URL}/w220_and_h330_face${item.poster_path}`
-            : DEFAULT_IMAGE;
-        const formattedDate = new Date(item.release_date).toLocaleDateString('es-ES', {
+        ? `${IMAGE_BASE_URL}/w220_and_h330_face${item.poster_path}`
+        : DEFAULT_IMAGE;
+        const formattedDate = new Date(type == 'movies' ? item.release_date : item.first_air_date).toLocaleDateString('es-ES', {
             day: '2-digit', month: 'long', year: 'numeric'
         });
         return `
@@ -201,7 +201,7 @@ const contentService = {
                         </button>
                         <!-- Botón de descarga -->
                         <button class="btn btn-sm btn-primary"
-                        	onclick="handleDownload('${item.id}', '${type}')">
+                        	onclick="contentService.handleDownload('${item.id}', '${type}')">
                             <i class="fas fa-download"></i>
                         </button>
                     </div>
@@ -320,47 +320,281 @@ const contentService = {
     },
 
     handleDownload(id, type) {
+        filtersManager.disableFilters();
+        domElements.pagination().innerHTML = '';
         if (type === 'movies') {
-            apiService.post(`/torrents/download/${id}`)
-                .then(() => alert('Descarga de película iniciada'))
-                .catch(error => console.error('Error al descargar película:', error));
+            apiService.fetch(`/movie/${id}`)
+                .then(data => this.renderMovieDetails(data))
+                .catch(error => console.error('Error al cargar detalles de la película:', error));
         } else if (type === 'tv') {
-            apiService.fetch(`/series/${id}`)
-                .then(data => showSeriesModal(data))
+            apiService.fetch(`/tv/${id}`)
+                .then(data => this.renderSeriesDetails(data))
                 .catch(error => console.error('Error al cargar detalles de la serie:', error));
         }
     },
 
+    renderMovieDetails(movie) {
+        const posterPath = movie.poster_path
+        ? `${IMAGE_BASE_URL}/w200${movie.poster_path}`
+        : DEFAULT_IMAGE;
+        const contentList = domElements.contentList();
+        const popularity = Math.round((movie.vote_average || 0) * 10);
+
+        let downloadInProgress = false;
+        let progressPercent = 0;
+
+
+        // Consultar el estado del torrent
+        apiService.fetch(`/torrent/${movie.id}/status`)
+            .then(response => {
+            if (response.status === "DOWNLOADING" || response.status === "SEEDING") {
+                downloadInProgress = true;
+                apiService.fetch(`/torrent/${movie.id}/progress`)
+                    .then(progressResponse => {
+                    progressPercent = progressResponse.percentDone * 100;
+                });
+            }
+            // Renderizar la interfaz
+            domElements.contentList().innerHTML = `
+                <div class="media-details">
+                    <div class="media-poster">
+                        <img src="${posterPath}" alt="Poster de ${movie.title}" />
+                    </div>
+                    <div class="media-info">
+                        <h1 class="media-title">${movie.title} <span class="media-year">(${movie.release_date})</span></h1>
+                        <p class="media-genres">Géneros: ${movie.genres.join(', ')}</p>
+                        <div class="media-score">
+                            <span class="score-circle">${popularity}%</span>
+                            <p class="score-label">Puntuación de usuarios</p>
+                        </div>
+                        <p class="media-overview">${movie.overview}</p>
+                        <div class="media-footer">
+                            ${downloadInProgress ? `
+                                <div class="progress mt-3" id="progress-${movie.id}">
+                                    <div class="progress-bar" role="progressbar" style="width: ${progressPercent}%;"
+                                         aria-valuenow="${progressPercent}" aria-valuemin="0" aria-valuemax="100">
+                                        ${Math.round(progressPercent)}%
+                                    </div>
+                                </div>
+                            ` : `
+                                <button class="btn btn-primary" onclick="contentService.selectTorrent('${movie.id}', 'movie')">
+                                    Seleccionar Torrent
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                </div>
+    `;
+        }).catch(error => console.error("Error al verificar el estado de la descarga:", error));
+
+    },
+
+    renderSeriesDetails(series) {
+        const posterPath = series.poster_path
+        ? `${IMAGE_BASE_URL}/w200${series.poster_path}`
+        : DEFAULT_IMAGE;
+        const contentList = domElements.contentList();
+        const popularity = Math.round((series.vote_average || 0) * 10);
+        contentList.innerHTML = `
+            <div class="media-details">
+                <div class="media-poster">
+                    <img src="${posterPath}" alt="Poster de ${series.name}" />
+                </div>
+                <div class="media-info">
+                    <h1 class="media-title">${series.name} <span class="media-year">(${series.first_air_date})</span></h1>
+                    <p class="media-genres">Géneros: ${series.genres.join(', ')}</p>
+                    <div class="media-score">
+                        <span class="score-circle">${popularity}%</span>
+                        <p class="score-label">Puntuación de usuarios</p>
+                    </div>
+                    <p class="media-overview">${series.overview}</p>
+                    <div class="media-footer">
+                        <p class="media-creator"><strong>Creador:</strong> ${series.creator}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="seasons-container">
+                <h2>Temporadas</h2>
+                <div id="seasonsList" class="accordion"></div>
+            </div>
+        `;
+
+        // Cargar temporadas dinámicamente
+        this.loadSeasons(series);
+    },
+
+    async loadSeasons(series) {
+        const sortedSeasons = [...series.seasons].sort((a, b) => a.season_number - b.season_number);
+
+        for (let i = 0; i < sortedSeasons.length; i++) {
+            const season = sortedSeasons[i];
+            await this.loadSeasonDetails(series.id, season.season_number);
+        }
+    },
+
+    async loadSeasonDetails(tvShowId, seasonNumber) {
+        try {
+            const season = await apiService.fetch(`/tv/${tvShowId}/season/${seasonNumber}`);
+            const seasonsList = document.getElementById('seasonsList');
+            const seasonDiv = document.createElement('div');
+            seasonDiv.classList.add('accordion-item');
+            seasonDiv.innerHTML = `
+            <h2 class="accordion-header" id="heading${seasonNumber}">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    data-bs-target="#collapse${seasonNumber}" aria-expanded="false"
+                    aria-controls="collapse${seasonNumber}">
+                    Temporada ${seasonNumber}
+                </button>
+            </h2>
+            <div id="collapse${seasonNumber}" class="accordion-collapse collapse"
+                aria-labelledby="heading${seasonNumber}" data-bs-parent="#accordionSeasons">
+                <div class="accordion-body">
+                    <ul class="list-group">
+                        ${season.episodes.map(episode => `
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                ${episode.episode_number}. ${episode.name}
+                            	<!-- Barra de progreso -->
+                                <div class="progress mt-2" style="display: none;" id="progress-${tvShowId}-${seasonNumber}-${episode.episode_number}">
+                                    <div class="progress-bar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+
+                                <button class="btn btn-sm btn-primary btn-media"
+                                    onclick="contentService.selectTorrent('${tvShowId}', 'tv', ${seasonNumber}, ${episode.episode_number})">
+                                    Seleccionar Torrent
+                                </button>
+                            </li>
+                        `).join('')}
+                    </ul>
+                </div>
+            </div>
+        `;
+            seasonsList.appendChild(seasonDiv);
+        } catch (error) {
+            console.error(`Error al cargar detalles de la temporada ${seasonNumber}:`, error);
+        }
+    },
+
+    selectTorrent(contentId, type, season = null, episode = null) {
+        let endpoint;
+        let reference = type === 'movie' ? contentId : `${contentId}-${season}-${episode}`;
+        if (type === 'movie') {
+            endpoint = `/movie/torrents/${contentId}`;
+        } else if (type === 'tv') {
+            endpoint = `/tv/torrents/${contentId}/season/${season}/episode/${episode}`;
+        } else {
+            console.error('Tipo de contenido desconocido:', type);
+            return;
+        }
+        // Mostrar el modal con la pantalla de carga
+        const torrentModal = new bootstrap.Modal(document.getElementById('torrentModal'));
+        const torrentDescription = document.getElementById('torrentDescription');
+
+        // Actualizar la descripción
+        torrentDescription.textContent = type === 'movie'
+        ? `Buscando torrents para la película (ID: ${contentId})`
+        : `Buscando torrents para el episodio ${episode} de la temporada ${season}`;
+
+        torrentModal.show();
+        torrentLoadingModal.show();
+
+
+        // Llamar al API para obtener los torrents disponibles
+        apiService.fetch(endpoint)
+            .then(data => {
+            const torrentList = document.getElementById('torrentList');
+
+            // Actualizar el contenido del modal
+            torrentDescription.textContent = type === 'movie'
+            ? `Seleccione un torrent para la película (ID: ${contentId})`
+            : `Seleccione un torrent para el episodio ${episode} de la temporada ${season}`;
+
+            const innerHTML = data.map(torrent => `
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            ${torrent.name} (${(torrent.size / (1024 ** 3)).toFixed(2)} Gbytes)
+                            <a class="btn btn-primary btn-sm" target="_blank"
+                                onclick="contentService.startDownload('${reference}', ${torrent.id})">
+                                Descargar
+                            </a>
+                        </li>
+                    `).join('');
+            torrentList.innerHTML = innerHTML;
+
+
+        })
+            .catch(error => console.error('Error al obtener los torrents:', error));
+    },
+
+    async startDownload(reference, downloadId) {
+        try {
+            // Llamar al endpoint para iniciar la descarga
+            const response = await apiService.post(`/torrent/${downloadId}/download`);
+            const torrentId = await response.json(); // ID de Transmission
+
+            // Mostrar y actualizar la barra de progreso del episodio
+            const progressBar = document.getElementById(`progress-${reference}`);
+            progressBar.style.display = "block";
+
+            const interval = setInterval(async () => {
+                try {
+                    const progressResponse = await apiService.fetch(`/torrent/${downloadId}/status`);
+                    const { percentDone } = progressResponse;
+
+                    // Actualizar la barra de progreso
+                    progressBar.style.width = `${percentDone * 100}%`;
+                    progressBar.textContent = `${Math.round(percentDone * 100)}%`;
+
+                    // Si la descarga está completa
+                    if (percentDone === 1) {
+                        clearInterval(interval);
+                        progressBar.textContent = "¡Descarga completada!";
+                        progressBar.classList.add("bg-success");
+                    }
+                } catch (error) {
+                    console.error("Error al verificar el progreso:", error);
+                    clearInterval(interval);
+                }
+            }, 3000); // Consultar cada 3 segundos
+        } catch (error) {
+            console.error("Error al iniciar la descarga:", error);
+        }
+    },
+
+    reloadContent() {
+        const category = appState.state.filters.category;
+        const type = utils.getContentType();
+        contentService.loadContent(category, type);
+    },
+
     renderDetailModal(data, providers) {
         const posterPath = data.poster_path
-            ? `${IMAGE_BASE_URL}/w500${data.poster_path}`
-            : DEFAULT_IMAGE;
+        ? `${IMAGE_BASE_URL}/w500${data.poster_path}`
+        : DEFAULT_IMAGE;
 
         domElements.detailModal().querySelector('#detail-image').innerHTML = `
             <img src="${posterPath}" alt="${data.title || data.name}" class="img-fluid" style="max-width: 220px;">
         `;
         domElements.detailModal().querySelector('#detail-title').textContent = data.title || data.name;
         domElements.detailModal().querySelector('#detail-date').textContent =
-            (data.release_date || data.first_air_date || '').split('-').reverse().join('-');
+        (data.release_date || data.first_air_date || '').split('-').reverse().join('-');
         domElements.detailModal().querySelector('#detail-overview').textContent = data.overview;
 
         const providersContainer = domElements.detailModal().querySelector('#detail-providers .d-flex');
         providersContainer.innerHTML = providers.length
-            ? providers.map(provider => `
+        ? providers.map(provider => `
                 <div class="me-3 text-center">
                     <img src="${IMAGE_BASE_URL}/w45${provider.logo_path}" alt="${provider.provider_name}" class="img-fluid mb-1">
-                    <p class="small">${provider.provider_name}</p>
+        
                 </div>
             `).join('')
-            : '<p class="text-muted">No disponible en ninguna operadora.</p>';
+        : '<p class="text-muted">No disponible en ninguna operadora.</p>';
     },
 
     async toggleFavorite(event, id, type) {
         event.stopPropagation();
         try {
             const favorites = type === 'movies'
-                ? appState.state.favorites.movies
-                : appState.state.favorites.series;
+            ? appState.state.favorites.movies
+            : appState.state.favorites.series;
             const isFavorite = favorites.has(id);
 
             await apiService.post(`/favorites?mediaId=${id}&mediaType=${type === 'movies' ? 'movie' : 'tv'}&favorite=${!isFavorite}`);
@@ -426,8 +660,8 @@ const contentService = {
 
     createSearchResultCard(item) {
         const posterPath = item.poster_path
-            ? `${IMAGE_BASE_URL}/w220_and_h330_face${item.poster_path}`
-            : DEFAULT_IMAGE;
+        ? `${IMAGE_BASE_URL}/w220_and_h330_face${item.poster_path}`
+        : DEFAULT_IMAGE;
         const releaseDate = item.release_date || item.first_air_date || 'Sin fecha';
         const formattedDate = new Date(releaseDate).toLocaleDateString('es-ES', {
             day: '2-digit', month: 'long', year: 'numeric'
@@ -466,43 +700,7 @@ const contentService = {
 
         console.log(`[changeSearchPage] Changing to page: ${page}`);
         await this.searchByTitle(query, page);
-    },
-
-    showSeriesModal(seriesData) {
-        const modal = document.getElementById("seriesModal");
-        document.getElementById("seriesTitle").textContent = seriesData.title;
-        document.getElementById("seriesPoster").src = seriesData.posterUrl;
-        document.getElementById("seriesReleaseDate").textContent = `Fecha de estreno: ${seriesData.releaseDate}`;
-
-        const seasonsList = document.getElementById("seasonsList");
-        seasonsList.innerHTML = "";
-
-        seriesData.seasons.forEach(season => {
-            const seasonDiv = document.createElement("div");
-            seasonDiv.classList.add("season");
-
-            const seasonTitle = document.createElement("h6");
-            seasonTitle.textContent = `Temporada ${season.number}`;
-            seasonDiv.appendChild(seasonTitle);
-
-            season.episodes.forEach(episode => {
-                const episodeDiv = document.createElement("div");
-                episodeDiv.classList.add("episode");
-                episodeDiv.innerHTML = `
-                    <span>${episode.number}. ${episode.title}</span>
-                    <button class="btn btn-sm btn-primary" onclick="downloadEpisode('${episode.id}')">
-                        <i class="fas fa-download"></i>
-                    </button>
-                `;
-                seasonDiv.appendChild(episodeDiv);
-            });
-
-            seasonsList.appendChild(seasonDiv);
-        });
-
-        new bootstrap.Modal(modal).show();
     }
-
 
 };
 
@@ -646,7 +844,7 @@ const filtersManager = {
         domElements.providersModal().addEventListener('show.bs.modal', () => {
             const contentType = utils.getContentType();
             renderManager.scheduleRender('providers-modal', () =>
-                this.renderProvidersInModal(contentType)
+            this.renderProvidersInModal(contentType)
             );
         });
 
@@ -716,20 +914,20 @@ const filtersManager = {
     async saveSelectedProviders(type) {
         try {
             const providers = type === 'movies'
-                ? appState.state.providers.movies
-                : appState.state.providers.series;
+            ? appState.state.providers.movies
+            : appState.state.providers.series;
 
             const selectedProviders = providers
                 .filter(provider => appState.state.providers.subscribed.has(provider.provider_id))
                 .map(({ provider_id, provider_name, logo_path }) => ({
-                    provider_id,
-                    provider_name,
-                    logo_path
-                }));
+                provider_id,
+                provider_name,
+                logo_path
+            }));
 
             await apiService.post('/providers/subscribe', selectedProviders);
             renderManager.scheduleRender('providers-list', () =>
-                providerService.renderSubscribedProviders()
+            providerService.renderSubscribedProviders()
             );
 
             bootstrap.Modal.getInstance(domElements.providersModal()).hide();
@@ -865,47 +1063,97 @@ const filtersManager = {
 
 };
 
-// Modified Loading Modal Management
+// Modificar el objeto loadingModal
 const loadingModal = {
     modal: null,
-    // Utility Functions for Modal Accessibility
-    setModalAccessibility(modalElement, isVisible) {
-        const mainContent = document.querySelector('.container-fluid'); // Usar otro contenedor global
+
+    setModalAccessibility(isVisible) {
+        const mainContent = document.querySelector('.container-fluid');
+        const modalElement = domElements.loadingModal();
 
         if (!mainContent || !modalElement) {
-            console.warn('Main content or modal element is missing. Skipping accessibility settings.');
+            console.warn('Main content or modal element is missing.');
             return;
         }
 
         if (isVisible) {
-            mainContent.setAttribute('aria-hidden', 'true');
+            // Hacer que el contenido principal sea inerte
             mainContent.setAttribute('inert', '');
-
-            modalElement.removeAttribute('aria-hidden');
+            // Asegurar que el modal es accesible
             modalElement.removeAttribute('inert');
-            modalElement.focus();
-        } else {
-            mainContent.removeAttribute('aria-hidden');
-            mainContent.removeAttribute('inert');
 
-            modalElement.setAttribute('aria-hidden', 'true');
+            // Manejar el foco
+            const firstFocusableElement = modalElement.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+            if (firstFocusableElement) {
+                firstFocusableElement.focus();
+            }
+        } else {
+            // Restaurar el contenido principal
+            mainContent.removeAttribute('inert');
+            // Hacer el modal inerte
             modalElement.setAttribute('inert', '');
         }
     },
+
     show() {
         if (!this.modal) {
             this.modal = new bootstrap.Modal(domElements.loadingModal());
         }
-        setModalAccessibility(domElements.loadingModal(), true); // Configuración de accesibilidad
+        this.setModalAccessibility(true);
         this.modal.show();
     },
 
     hide() {
         if (this.modal) {
+            this.setModalAccessibility(false);
             this.modal.hide();
-            setModalAccessibility(domElements.loadingModal(), false); // Restaurar accesibilidad
             this.modal = null;
         }
+    }
+};
+
+const torrentLoadingModal = {
+    setModalAccessibility(isVisible) {
+        const mainContent = document.querySelector('.container-fluid');
+        const modalElement = document.getElementById('torrentModal');
+
+        if (!mainContent || !modalElement) {
+            console.warn('Main content or torrent modal element is missing.');
+            return;
+        }
+
+        if (isVisible) {
+            mainContent.setAttribute('inert', '');
+            modalElement.removeAttribute('inert');
+
+            // Manejar el foco
+            const closeButton = modalElement.querySelector('.btn-close');
+            if (closeButton) {
+                closeButton.focus();
+            }
+        } else {
+            mainContent.removeAttribute('inert');
+            modalElement.setAttribute('inert', '');
+        }
+    },
+
+    show() {
+        const modalContent = document.getElementById('torrentList');
+        if (modalContent) {
+            modalContent.innerHTML = `
+                <div class="text-center my-5">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Cargando torrents...</span>
+                    </div>
+                    <p class="mt-3" role="status">Buscando torrents disponibles...</p>
+                </div>
+            `;
+        }
+        this.setModalAccessibility(true);
+    },
+
+    hide() {
+        this.setModalAccessibility(false);
     }
 };
 
@@ -927,6 +1175,33 @@ async function initializeApp() {
             appState.state.filters.sort,
             appState.state.pagination.currentPage
         );
+        // Capturar el cierre de la ventana modal de torrents
+        const torrentModal = document.getElementById("torrentModal");
+
+        if (torrentModal) {
+            torrentModal.addEventListener("hidden.bs.modal", function () {
+                console.log("La ventana modal de torrents se ha cerrado.");
+
+                // Habilitar el contenido principal si estaba bloqueado
+                const mainContent = document.querySelector('.container-fluid');
+                if (mainContent) {
+                    mainContent.removeAttribute('inert');
+                }
+
+                // Asegurar que el modal de carga también se oculta si está activo
+                if (typeof torrentLoadingModal !== 'undefined' && torrentLoadingModal.hide) {
+                    torrentLoadingModal.hide();
+                }
+
+                // Opcional: limpiar la lista de torrents al cerrar la modal
+                const torrentList = document.getElementById("torrentList");
+                if (torrentList) {
+                    torrentList.innerHTML = "";
+                }
+            });
+        } else {
+            console.error("No se encontró el elemento torrentModal.");
+        }
         //loadingModal.hide();
     } catch (error) {
         console.error('Error in initialization:', error);

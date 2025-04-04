@@ -1,10 +1,8 @@
 package com.stremio.addon.controller;
 
-import com.stremio.addon.service.TransmissionService;
+import com.stremio.addon.service.transmission.TransmissionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.io.IOException;
 
 @RestController
 @RequestMapping(value = "/transmission", produces = "application/json")
@@ -55,13 +53,5 @@ public class TransmissionController {
         }
     }
 
-    @PostMapping("/upload-torrent")
-    public ResponseEntity<String> uploadTorrent(@RequestParam Integer searchId) {
-        try {
-            transmissionService.addTorrentFromSearchId(searchId);
-            return ResponseEntity.ok("Torrent successfully uploaded.");
-        } catch (Exception e) {
-            return ResponseEntity.status(500).body("Error: " + e.getMessage());
-        }
-    }
+
 }

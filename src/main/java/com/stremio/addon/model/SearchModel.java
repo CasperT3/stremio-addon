@@ -21,8 +21,11 @@ public class SearchModel {
     @Column("type")
     private String type; // Representa el ENUM ('series', 'movies') como String en Java.
 
-    @Column("identifier")
-    private String identifier;
+    @Column("imdb_id")
+    private String imdbId;
+
+    @Column("tmdb_id")
+    private Integer tmdbId;
 
     @Column("title")
     private String title;

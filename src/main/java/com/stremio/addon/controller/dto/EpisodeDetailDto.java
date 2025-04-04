@@ -1,10 +1,10 @@
-package com.stremio.addon.service.tmdb.dto;
+package com.stremio.addon.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
-public class EpisodeDetail {
+public class EpisodeDetailDto {
     @JsonProperty("air_date")
     private String airDate;
     @JsonProperty("episode_number")

@@ -16,5 +16,6 @@ public class TorrentInfoModel {
     private Integer searchId; // Representa la clave foránea a la tabla "search".
     private String name;
     private String status;
+    private Integer downloadId;
     private byte[] content;
 }

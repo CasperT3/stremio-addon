@@ -136,7 +136,8 @@
                             <div class="mt-3" id="providers-list">
                                 <!-- Proveedores seleccionados dinámicamente aquí -->
                             </div>
-                                                    <!-- Botones Aplicar/Eliminar -->
+
+                            <!-- Botones Aplicar/Eliminar -->
                         <div class="text-center mb-3">
                             <div class="d-flex justify-content-center gap-2">
                                 <button class="btn custom-btn btn-primary" id="filterApplyButton">Aplicar</button>
@@ -161,6 +162,37 @@
                         <!-- Paginación dinámica -->
                     </ul>
                 </nav>
+            </div>
+        </div>
+    </div>
+
+    <!-- Torrent Modal-->
+    <div class="modal fade"
+         id="torrentModal"
+         tabindex="-1"
+         aria-labelledby="torrentModalLabel"
+         aria-modal="true"
+         role="dialog">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="torrentModalLabel">Torrents Disponibles</h5>
+                    <button type="button"
+                            class="btn-close"
+                            data-bs-dismiss="modal"
+                            aria-label="Cerrar ventana de torrents"></button>
+                </div>
+                <div class="modal-body">
+                    <p id="torrentDescription" class="mb-3" role="status"></p>
+                    <ul id="torrentList" class="list-group" role="list">
+                        <!-- El contenido se cargará dinámicamente -->
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button"
+                            class="btn btn-secondary"
+                            data-bs-dismiss="modal">Cerrar</button>
+                </div>
             </div>
         </div>
     </div>

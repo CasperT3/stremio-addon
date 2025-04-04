@@ -3,6 +3,7 @@ package com.stremio.addon.service;
 import com.stremio.addon.model.SearchModel;
 import com.stremio.addon.repository.SearchRepository;
 import com.stremio.addon.repository.TorrentInfoRepository;
+import com.stremio.addon.service.transmission.TransmissionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

@@ -7,4 +7,6 @@ import java.util.Optional;
 
 public interface TorrentInfoRepository extends CrudRepository<TorrentInfoModel, Integer>{
     Optional<TorrentInfoModel> findByName(String torrentName);
+
+    Optional<TorrentInfoModel> findByDownloadId(int torrentId);
 }

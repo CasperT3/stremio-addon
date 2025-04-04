@@ -1,10 +1,14 @@
+
 package com.stremio.addon.controller;
 
+import com.stremio.addon.controller.dto.MovieDto;
 import com.stremio.addon.controller.dto.ProviderDto;
+import com.stremio.addon.controller.dto.ResultsDto;
+import com.stremio.addon.controller.dto.SeriesDto;
 import com.stremio.addon.service.FavoritesService;
+import com.stremio.addon.service.transmission.TransmissionService;
 import com.stremio.addon.service.tmdb.TmdbService;
-import com.stremio.addon.service.tmdb.dto.*;
-import lombok.RequiredArgsConstructor;
+import com.stremio.addon.service.transmission.dto.TorrentInfo;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -13,11 +17,17 @@ import java.util.Map;
 
 @RestController
 @RequestMapping(value = "/api/tmdb", produces = "application/json")
-@RequiredArgsConstructor
-public class TmdbController {
+public class ApiController {
 
     private final TmdbService tmdbService;
     private final FavoritesService favoritesService;
+    private final TransmissionService transmissionService;
+
+    public ApiController(TmdbService tmdbService, FavoritesService favoritesService, TransmissionService transmissionService) {
+        this.tmdbService = tmdbService;
+        this.favoritesService = favoritesService;
+        this.transmissionService = transmissionService;
+    }
 
     /**
      * Get the title of a movie or TV show by IMDb ID.
@@ -34,8 +44,8 @@ public class TmdbController {
      * Get details of a movie by TMDB ID.
      */
     @GetMapping("/movie/{tmdbId}")
-    public ResponseEntity<MovieDetail> getMovieDetail(@PathVariable int tmdbId) {
-        MovieDetail movieDetail = tmdbService.getMovieDetail(tmdbId);
+    public ResponseEntity<?> getMovieDetail(@PathVariable int tmdbId) {
+        var movieDetail = tmdbService.getMovieDetail(tmdbId);
         return ResponseEntity.ok(movieDetail);
     }
 
@@ -43,32 +53,38 @@ public class TmdbController {
      * Get details of a TV show by TMDB ID.
      */
     @GetMapping("/tv/{tvShowId}")
-    public ResponseEntity<TvShowDetail> getTvShowDetail(@PathVariable int tvShowId) {
-        TvShowDetail tvShowDetail = tmdbService.getTvShowDetail(tvShowId);
+    public ResponseEntity<?> getTvShow(@PathVariable int tvShowId) {
+        var tvShowDetail = tmdbService.getTvShowDetail(tvShowId);
         return ResponseEntity.ok(tvShowDetail);
     }
 
     /**
-     * Get details of all episodes in a specific season of a TV show.
-     *
-     * @param tvShowId    The TMDB ID of the TV show.
-     * @param seasonNumber The season number to fetch.
-     * @return Details of the episodes in the season.
+     * Get details of a TV show by TMDB ID.
      */
-    @GetMapping("/tv/{tvShowId}/season/{seasonNumber}/episodes")
-    public ResponseEntity<SeasonDetail> getSeasonDetails(
-            @PathVariable int tvShowId,
-            @PathVariable int seasonNumber) {
-        SeasonDetail seasonDetail = tmdbService.getSeasonDetails(tvShowId, seasonNumber);
-        return ResponseEntity.ok(seasonDetail);
+    @GetMapping("/tv/{tvShowId}/season/{season}")
+    public ResponseEntity<?> getSeasonDetail(@PathVariable int tvShowId, @PathVariable int season) {
+        var tvShowDetail = tmdbService.getSeasonDetails(tvShowId, season);
+        return ResponseEntity.ok(tvShowDetail);
+    }
+
+    @GetMapping("/movie/torrents/{movieId}")
+    public ResponseEntity<?> getTorrentsMovie(@PathVariable int movieId) {
+        var torrents = tmdbService.getTorrentsForMovie(movieId);
+        return ResponseEntity.ok(torrents);
+    }
+
+    @GetMapping("/tv/torrents/{tvShowId}/season/{season}/episode/{episode}")
+    public ResponseEntity<?> getTorrentsSeries(@PathVariable int tvShowId, @PathVariable int season, @PathVariable int episode) {
+        var torrents = tmdbService.getTorrentsForTvShow(tvShowId, season, episode);
+        return ResponseEntity.ok(torrents);
     }
 
     /**
      * Get trending movies with pagination.
      */
     @GetMapping("/trending/movies")
-    public ResponseEntity<PaginatedMovies> getTrendingMovies(@RequestParam(defaultValue = "1") int page) {
-        PaginatedMovies trendingMovies = tmdbService.getTrendingMovies(page);
+    public ResponseEntity<?> getTrendingMovies(@RequestParam(defaultValue = "1") int page) {
+        var trendingMovies = tmdbService.getTrendingMovies(page);
         return ResponseEntity.ok(trendingMovies);
     }
 
@@ -76,8 +92,8 @@ public class TmdbController {
      * Get trending TV shows with pagination.
      */
     @GetMapping("/trending/tv")
-    public ResponseEntity<PaginatedTvShows> getTrendingTvShows(@RequestParam(defaultValue = "1") int page) {
-        PaginatedTvShows trendingTvShows = tmdbService.getTrendingTvShows(page);
+    public ResponseEntity<?> getTrendingTvShows(@RequestParam(defaultValue = "1") int page) {
+        var trendingTvShows = tmdbService.getTrendingTvShows(page);
         return ResponseEntity.ok(trendingTvShows);
     }
 
@@ -85,10 +101,10 @@ public class TmdbController {
      * Get favorite movies with pagination and sorting.
      */
     @GetMapping("/favorites/movies")
-    public ResponseEntity<PaginatedMovies> getFavoriteMovies(
+    public ResponseEntity<?> getFavoriteMovies(
             @RequestParam int page,
             @RequestParam(defaultValue = "popularity.desc") String sortBy) {
-        PaginatedMovies favoriteMovies = tmdbService.getFavoriteMovies(page, sortBy);
+        var favoriteMovies = tmdbService.getFavoriteMovies(page, sortBy);
         return ResponseEntity.ok(favoriteMovies);
     }
 
@@ -96,10 +112,10 @@ public class TmdbController {
      * Get favorite TV shows with pagination and sorting.
      */
     @GetMapping("/favorites/tv")
-    public ResponseEntity<PaginatedTvShows> getFavoriteTvShows(
+    public ResponseEntity<?> getFavoriteTvShows(
             @RequestParam int page,
             @RequestParam(defaultValue = "created_at.asc") String sortBy) {
-        PaginatedTvShows favoriteTvShows = tmdbService.getFavoriteTvShows(page, sortBy);
+        var favoriteTvShows = tmdbService.getFavoriteTvShows(page, sortBy);
         return ResponseEntity.ok(favoriteTvShows);
     }
 
@@ -122,9 +138,9 @@ public class TmdbController {
      * @return Lista paginada de películas que coinciden con los filtros.
      */
     @GetMapping("/discover/movies")
-    public ResponseEntity<PaginatedMovies> discoverMovies(
+    public ResponseEntity<ResultsDto<MovieDto>> discoverMovies(
             @RequestParam Map<String, String> filters) {
-        PaginatedMovies movies = tmdbService.discoverMovies(filters);
+        var movies = tmdbService.discoverMovies(filters);
         return ResponseEntity.ok(movies);
     }
 
@@ -135,22 +151,22 @@ public class TmdbController {
      * @return Lista paginada de series que coinciden con los filtros.
      */
     @GetMapping("/discover/tv")
-    public ResponseEntity<PaginatedTvShows> discoverTvShows(
+    public ResponseEntity<ResultsDto<SeriesDto>> discoverTvShows(
             @RequestParam Map<String, String> filters) {
-        PaginatedTvShows tvShows = tmdbService.discoverTvShows(filters);
+        var tvShows = tmdbService.discoverTvShows(filters);
         return ResponseEntity.ok(tvShows);
     }
 
     @GetMapping("/watch/providers/tv")
     public ResponseEntity<?> getTvWatchProviders() {
-        ProvidersResponse response = tmdbService.getTvWatchProviders();
-        return ResponseEntity.ok(response.getResults());
+        var response = tmdbService.getTvWatchProviders();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/watch/providers/movies")
     public ResponseEntity<?> getMovieProviders() {
-        ProvidersResponse response = tmdbService.getMovieProviders();
-        return ResponseEntity.ok(response.getResults());
+        var response = tmdbService.getMovieProviders();
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("{tv}/watch/providers/tv")
@@ -178,10 +194,39 @@ public class TmdbController {
      * Buscar películas o series por título.
      */
     @GetMapping("/search")
-    public ResponseEntity<PaginatedSearchResults> searchMoviesOrSeries(
+    public ResponseEntity<?> searchMoviesOrSeries(
             @RequestParam String query,
             @RequestParam(defaultValue = "1") int page) {
-        PaginatedSearchResults searchResults = tmdbService.search(query, page);
+        var searchResults = tmdbService.search(query, page);
         return ResponseEntity.ok(searchResults);
+    }
+
+    @PostMapping("/torrent/{id}/download")
+    public ResponseEntity<?> downloadTorrent(@PathVariable Integer id) {
+        var torrent = transmissionService.addTorrent(id);
+        return ResponseEntity.ok(torrent);
+    }
+
+    @GetMapping("/torrent/{id}/status")
+    public ResponseEntity<?> checkMovieStatus(@PathVariable Integer id) {
+        var status = transmissionService.checkTorrentStatus(id);
+        return ResponseEntity.ok(status);
+    }
+    @GetMapping("/torrent/{id}/{season}/{episode}/status")
+    public ResponseEntity<?> checkSeriesStatus(@PathVariable Integer id, @PathVariable Integer season, @PathVariable Integer episode) {
+        var status = transmissionService.checkTorrentStatus(id, season, episode);
+        return ResponseEntity.ok(status);
+    }
+
+    @GetMapping("/torrent/{id}/progress")
+    public ResponseEntity<?> checkTorrentProgress(@PathVariable Integer id) {
+        TorrentInfo info = transmissionService.checkTorrentProgress(id);
+        return ResponseEntity.ok(info);
+    }
+
+    @GetMapping("/torrent/{id}/{season}/{episode}/progress")
+    public ResponseEntity<?> checkTorrentProgress(@PathVariable Integer id, @PathVariable Integer season, @PathVariable Integer episode) {
+        TorrentInfo info = transmissionService.checkTorrentProgress(id, season, episode);
+        return ResponseEntity.ok(info);
     }
 }

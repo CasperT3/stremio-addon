@@ -4,7 +4,9 @@ import be.adaxisoft.bencode.BDecoder;
 import be.adaxisoft.bencode.BEncodedValue;
 import be.adaxisoft.bencode.BEncoder;
 import com.stremio.addon.controller.dto.Stream;
+import com.stremio.addon.controller.dto.TorrentDto;
 import com.stremio.addon.model.TorrentInfoModel;
+import com.stremio.addon.service.transmission.dto.TorrentInfo;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.Named;
@@ -22,6 +24,8 @@ import java.util.Map;
 public interface TorrentMapper {
     TorrentMapper INSTANCE = Mappers.getMapper(TorrentMapper.class);
 
+    TorrentInfo mapToTorrentInfo(TorrentInfoModel model);
+
     @Mapping(source = "content", target = "infoHash", qualifiedByName = "getInfoHash")
     @Mapping(source = "content", target = "behaviorHints", qualifiedByName = "getBehaviorHints")
     @Mapping(source = "content", target = "sources", qualifiedByName = "getTrackers")
@@ -31,7 +35,6 @@ public interface TorrentMapper {
 
     @Mapping(source = "data", target = "content")
     @Mapping(source = "data", target = "name", qualifiedByName = "getFilename")
-    @Mapping(target = "status", constant = "PENDING")
     TorrentInfoModel map(byte[] data);
 
     @Named("getInfoHash")
@@ -144,10 +147,17 @@ public interface TorrentMapper {
         }
     }
 
-    private byte[] encodeMapToBytes(Map<String, BEncodedValue> map) throws Exception {
-        try (ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-            BEncoder.encode(map, outputStream);
-            return outputStream.toByteArray();
+    @Mapping(source = "torrentInfoModel", target = "size", qualifiedByName = "getTotalSize")
+    TorrentDto mapToDto(TorrentInfoModel torrentInfoModel);
+
+    @Named("getTotalSize")
+    default Long getTotalSize(TorrentInfoModel torrentInfoModel) {
+        try {
+            var behaviorHints = getBehaviorHints(torrentInfoModel.getContent());
+           	return (Long) behaviorHints.get("videoSize");
+        } catch (Exception e) {
+            throw new RuntimeException("Error extracting total file size from info map", e);
         }
     }
+
 }

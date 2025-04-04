@@ -4,14 +4,15 @@ import com.stremio.addon.configuration.AddonConfiguration;
 import com.stremio.addon.model.SearchModel;
 import com.stremio.addon.repository.SearchRepository;
 import com.stremio.addon.repository.TorrentInfoRepository;
+import com.stremio.addon.service.transmission.TransmissionService;
+import com.stremio.addon.service.transmission.dto.TorrentInfo;
+import com.stremio.addon.service.transmission.dto.TorrentStatus;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service
@@ -34,20 +35,20 @@ public class TorrentMonitorService {
         this.addonConfiguration = addonConfiguration;
     }
 
-    @Scheduled(fixedRateString = "${torrent.monitor.interval:60000}")
+    //@Scheduled(fixedRateString = "${torrent.monitor.interval:60000}")
     public void monitorTorrents() {
         log.info("Checking active downloads...");
-        List<Map<String, Object>> activeTorrents = transmissionService.checkActiveDownloads();
+        List<TorrentInfo> activeTorrents = transmissionService.checkActiveDownloads();
 
-        for (Map<String, Object> torrent : activeTorrents) {
-            String name = (String) torrent.get("name");
-            double percentDone = (double) torrent.get("percentDone");
-            int status = (int) torrent.get("status");
-            int torrentId = (int) torrent.get("id"); // Obtener el ID del torrent
+        for (TorrentInfo torrent : activeTorrents) {
+            String name = (String) torrent.getName();
+            double percentDone = (double) torrent.getPercentDone();
+            var status = torrent.getStatus();
+            int torrentId = (int) torrent.getId(); // Obtener el ID del torrent
 
             log.info("Torrent: {}, Progress: {}%, Status: {}", name, percentDone * 100, status);
 
-            if (status == 6 && percentDone == 1.0) { // 6 = Seeding, 1.0 = 100% completed
+            if (status.equals(TorrentStatus.SEEDING) && percentDone == 1.0) { // 6 = Seeding, 1.0 = 100% completed
                 handleCompletedTorrent(name, torrentId);
             }
         }

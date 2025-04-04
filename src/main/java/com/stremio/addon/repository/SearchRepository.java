@@ -5,14 +5,15 @@ import org.springframework.data.repository.CrudRepository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.StreamSupport;
 
 public interface SearchRepository extends CrudRepository<SearchModel, Integer> {
-    List<SearchModel> findByIdentifier(String id);
+    List<SearchModel> findByImdbId(String id);
 
-    Optional<SearchModel> findByIdentifierAndSeasonAndEpisode(String imdbId, Integer season, Integer episode);
+    Optional<SearchModel> findByImdbIdAndSeasonAndEpisode(String imdbId, Integer season, Integer episode);
 
-    void deleteByIdentifier(String id);
+    List<SearchModel> findByTmdbId(int id);
 
-    Optional<SearchModel> findByIdentifierAndType(String id, String movie);
+    Optional<SearchModel> findByTmdbIdAndSeasonAndEpisode(int tvShowId, int season, int episode);
 }
 

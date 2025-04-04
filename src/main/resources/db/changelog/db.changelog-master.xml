@@ -34,8 +34,11 @@
             <column name="title" type="varchar(250)">
                 <constraints nullable="false"/>
             </column>
-            <column name="identifier" type="varchar(50)">
+            <column name="imdb_id" type="varchar(50)">
                 <constraints nullable="false"/>
+            </column>
+            <column name="tmdb_id" type="int">
+            	<constraints nullable="false"/>
             </column>
             <column name="year" type="int"/>
             <column name="season" type="int"/>
@@ -70,6 +73,9 @@
             </column>
             <column name="status" type="VARCHAR(100)">
                 <constraints nullable="false"/>
+            </column>
+            <column name="download_id" type="int">
+                <constraints nullable="true"/>
             </column>
             <column name="content" type="LONGBLOB">
                 <constraints nullable="false"/>

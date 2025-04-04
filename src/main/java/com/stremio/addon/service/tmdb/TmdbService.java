@@ -1,12 +1,18 @@
 package com.stremio.addon.service.tmdb;
 
 import com.stremio.addon.configuration.TmdbConfiguration;
-import com.stremio.addon.controller.dto.ProviderDto;
+import com.stremio.addon.controller.dto.*;
+import com.stremio.addon.mapper.MovieMapper;
 import com.stremio.addon.mapper.ProviderMapper;
+import com.stremio.addon.mapper.SerieMapper;
+import com.stremio.addon.mapper.TorrentMapper;
 import com.stremio.addon.model.ProviderModel;
 import com.stremio.addon.repository.ProviderRepository;
+import com.stremio.addon.repository.SearchRepository;
+import com.stremio.addon.service.SearchService;
 import com.stremio.addon.service.tmdb.dto.*;
 import lombok.extern.slf4j.Slf4j;
+import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.HttpEntity;
@@ -28,23 +34,21 @@ import java.util.stream.StreamSupport;
 @Service
 public class TmdbService {
 
-    private static final Map<String, String> CONTENT_TYPE_MAP = Map.of(
-            "movie", "movie_results",
-            "series", "tv_results"
-    );
-    private static final Map<String, String> TITLE_KEY_MAP = Map.of(
-            "movie", "title",
-            "series", "name"
-    );
+    private static final Map<String, String> CONTENT_TYPE_MAP = Map.of("movie", "movie_results", "series", "tv_results");
+    private static final Map<String, String> TITLE_KEY_MAP = Map.of("movie", "title", "series", "name");
     private final TmdbConfiguration configuration;
     private final RestTemplate restTemplate;
     private final ProviderRepository providerRepository;
+    private final SearchRepository searchRepository;
+    private final SearchService searchService;
 
     @Autowired
-    public TmdbService(TmdbConfiguration configuration, @Qualifier("restTemplateJson") RestTemplate restTemplate, ProviderRepository providerRepository) {
+    public TmdbService(TmdbConfiguration configuration, @Qualifier("restTemplateJson") RestTemplate restTemplate, ProviderRepository providerRepository, SearchRepository searchRepository, SearchService searchService) {
         this.configuration = configuration;
         this.restTemplate = restTemplate;
         this.providerRepository = providerRepository;
+        this.searchRepository = searchRepository;
+        this.searchService = searchService;
     }
 
     /**
@@ -58,19 +62,16 @@ public class TmdbService {
 
     /**
      * Buscar información por ID en TMDB.
-     *
+     * <p>
      * Este método utiliza la API de TMDB para buscar información sobre películas, series o personas
      * usando un ID específico y un origen externo.
      *
-     * @param id El ID a buscar.
+     * @param id             El ID a buscar.
      * @param externalSource El origen externo (por ejemplo, "imdb_id", "tvdb_id").
      * @return Un objeto Map que contiene los resultados.
      */
     public FindResults findById(String id, String externalSource) {
-        String url = String.format("%s/find/%s?external_source=imdb_id&language=es-ES",
-                configuration.getApiUrl(),
-                id,
-                externalSource);
+        String url = String.format("%s/find/%s?external_source=imdb_id&language=es-ES", configuration.getApiUrl(), id, externalSource);
         logRequest("Find By ID", url, Map.of("ID", id, "External Source", externalSource));
         return executeRequest(url, FindResults.class);
     }
@@ -84,57 +85,55 @@ public class TmdbService {
     /**
      * Retrieve detailed information of a movie from TMDB based on the TMDB ID.
      */
-    public MovieDetail getMovieDetail(int tmdbId) {
+    public MovieDetailDto getMovieDetail(int tmdbId) {
         String url = String.format("%s/movie/%d?language=es-ES", configuration.getApiUrl(), tmdbId);
         logRequest("Get Movie Detail", url, Map.of("TMDB ID", tmdbId));
-        return executeRequest(url, MovieDetail.class);
+        return MovieMapper.INSTANCE.map(executeRequest(url, MovieDetail.class));
     }
 
     /**
      * Retrieve detailed information of a TV show from TMDB based on the TMDB ID.
      */
-    public TvShowDetail getTvShowDetail(int tmdbId) {
+    public SeriesDetailDto getTvShowDetail(int tmdbId) {
         String url = String.format("%s/tv/%d?language=es-ES", configuration.getApiUrl(), tmdbId);
         logRequest("Get TV Show Detail", url, Map.of("TMDB ID", tmdbId));
-        return executeRequest(url, TvShowDetail.class);
+        return SerieMapper.INSTANCE.map(executeRequest(url, TvShowDetail.class));
     }
 
     /**
      * Fetch trending movies for the day with pagination.
      */
-    public PaginatedMovies getTrendingMovies(int page) {
+    public ResultsDto<MovieDto> getTrendingMovies(int page) {
         String url = String.format("%s/trending/movie/day?language=es-ES&page=%d", configuration.getApiUrl(), page);
         logRequest("Get Trending Movies", url, Map.of("Page", page));
-        return executeRequest(url, PaginatedMovies.class);
+        return MovieMapper.INSTANCE.map(executeRequest(url, PaginatedMovies.class));
     }
 
     /**
      * Fetch trending TV shows for the day with pagination.
      */
-    public PaginatedTvShows getTrendingTvShows(int page) {
+    public ResultsDto<SeriesDto> getTrendingTvShows(int page) {
         String url = String.format("%s/trending/tv/day?language=es-ES&page=%d", configuration.getApiUrl(), page);
         logRequest("Get Trending TV Shows", url, Map.of("Page", page));
-        return executeRequest(url, PaginatedTvShows.class);
+        return SerieMapper.INSTANCE.map(executeRequest(url, PaginatedTvShows.class));
     }
 
     /**
      * Fetch favorite movies for the current account with pagination and sorting.
      */
-    public PaginatedMovies getFavoriteMovies(int page, String sortBy) {
-        String url = String.format("%s/account/%s/favorite/movies?language=es-ES&page=%d&sort_by=%s",
-                configuration.getApiUrl(), configuration.getAccountId(), page, sortBy);
+    public ResultsDto<MovieDto> getFavoriteMovies(int page, String sortBy) {
+        String url = String.format("%s/account/%s/favorite/movies?language=es-ES&page=%d&sort_by=%s", configuration.getApiUrl(), configuration.getAccountId(), page, sortBy);
         logRequest("Get Favorite Movies", url, Map.of("Page", page, "Sort By", sortBy));
-        return executeRequest(url, PaginatedMovies.class);
+        return MovieMapper.INSTANCE.map(executeRequest(url, PaginatedMovies.class));
     }
 
     /**
      * Fetch favorite TV shows for the current account with pagination and sorting.
      */
-    public PaginatedTvShows getFavoriteTvShows(int page, String sortBy) {
-        String url = String.format("%s/account/%s/favorite/tv?language=es-ES&page=%d&sort_by=%s",
-                configuration.getApiUrl(), configuration.getAccountId(), page, sortBy);
+    public ResultsDto<SeriesDto> getFavoriteTvShows(int page, String sortBy) {
+        String url = String.format("%s/account/%s/favorite/tv?language=es-ES&page=%d&sort_by=%s", configuration.getApiUrl(), configuration.getAccountId(), page, sortBy);
         logRequest("Get Favorite TV Shows", url, Map.of("Page", page, "Sort By", sortBy));
-        return executeRequest(url, PaginatedTvShows.class);
+        return SerieMapper.INSTANCE.map(executeRequest(url, PaginatedTvShows.class));
     }
 
     /**
@@ -150,14 +149,14 @@ public class TmdbService {
     /**
      * Retrieve episode details for a specific season of a TV show.
      *
-     * @param tvShowId    The TMDB ID of the TV show.
+     * @param tvShowId     The TMDB ID of the TV show.
      * @param seasonNumber The season number to fetch.
      * @return A list of episode details.
      */
-    public SeasonDetail getSeasonDetails(int tvShowId, int seasonNumber) {
+    public SeasonDetailDto getSeasonDetails(int tvShowId, int seasonNumber) {
         String url = String.format("%s/tv/%d/season/%d?language=es-ES", configuration.getApiUrl(), tvShowId, seasonNumber);
         logRequest("Get Season Details", url, Map.of("TV Show ID", tvShowId, "Season Number", seasonNumber));
-        return executeRequest(url, SeasonDetail.class);
+        return SerieMapper.INSTANCE.map(executeRequest(url, SeasonDetail.class));
     }
 
     /**
@@ -173,12 +172,7 @@ public class TmdbService {
     private <T, R> R executeRequest(String url, Class<T> responseType, ResponseProcessor<T, R> processor) {
         try {
             log.debug("Executing GET request: {}", url);
-            ResponseEntity<T> response = restTemplate.exchange(
-                    url,
-                    HttpMethod.GET,
-                    createHttpEntity(),
-                    responseType
-            );
+            ResponseEntity<T> response = restTemplate.exchange(url, HttpMethod.GET, createHttpEntity(), responseType);
             log.info("Successfully executed GET request: {}", url);
             return processor.process(response.getBody());
         } catch (Exception e) {
@@ -262,12 +256,11 @@ public class TmdbService {
      * @param params A map of query parameters (e.g., "release_date.gte", "genres", etc.)
      * @return A paginated list of movies.
      */
-    public PaginatedMovies discoverMovies(Map<String, String> params) {
+    public ResultsDto<MovieDto> discoverMovies(Map<String, String> params) {
         StringBuilder urlBuilder = new StringBuilder(String.format("%s/discover/movie?language=es-ES", configuration.getApiUrl()));
         params.forEach((key, value) -> urlBuilder.append("&").append(key).append("=").append(value));
         String url = urlBuilder.toString();
-        // logRequest("Discover Movies", url, params);
-        return executeRequest(url, PaginatedMovies.class);
+        return MovieMapper.INSTANCE.map(executeRequest(url, PaginatedMovies.class));
     }
 
     /**
@@ -276,12 +269,12 @@ public class TmdbService {
      * @param params A map of query parameters (e.g., "first_air_date.gte", "genres", etc.)
      * @return A paginated list of TV shows.
      */
-    public PaginatedTvShows discoverTvShows(Map<String, String> params) {
+    public ResultsDto<SeriesDto> discoverTvShows(Map<String, String> params) {
         StringBuilder urlBuilder = new StringBuilder(String.format("%s/discover/tv?language=es-ES", configuration.getApiUrl()));
         params.forEach((key, value) -> urlBuilder.append("&").append(key).append("=").append(value));
         String url = urlBuilder.toString();
         //    logRequest("Discover TV Shows", url, params);
-        return executeRequest(url, PaginatedTvShows.class);
+        return SerieMapper.INSTANCE.map(executeRequest(url, PaginatedTvShows.class));
     }
 
     /**
@@ -290,10 +283,10 @@ public class TmdbService {
      *
      * @return A response object containing the list of providers.
      */
-    public ProvidersResponse getTvWatchProviders() {
+    public List<ProviderDto> getTvWatchProviders() {
         String url = String.format("%s/watch/providers/tv?language=es-ES&watch_region=ES", configuration.getApiUrl());
         logRequest("Get TV Watch Providers", url, Map.of());
-        return executeRequest(url, ProvidersResponse.class);
+        return ProviderMapper.INSTANCE.map(executeRequest(url, ProvidersResponse.class).getResults());
     }
 
     /**
@@ -302,30 +295,22 @@ public class TmdbService {
      *
      * @return A response object containing the list of providers.
      */
-    public ProvidersResponse getMovieProviders() {
+    public List<ProviderDto> getMovieProviders() {
         String url = String.format("%s/watch/providers/movie?language=es-ES&watch_region=ES", configuration.getApiUrl());
         logRequest("Get TV Watch Providers", url, Map.of());
-        return executeRequest(url, ProvidersResponse.class);
+        return ProviderMapper.INSTANCE.map(executeRequest(url, ProvidersResponse.class).getResults());
     }
 
     public void saveUserProviders(List<ProviderDto> providers) {
-        Set<ProviderModel> existingProviders = StreamSupport
-                .stream(providerRepository.findAll().spliterator(), false)
-                .collect(Collectors.toSet());
+        Set<ProviderModel> existingProviders = StreamSupport.stream(providerRepository.findAll().spliterator(), false).collect(Collectors.toSet());
 
-        Set<ProviderModel> newProviders = providers.stream()
-                .map(ProviderMapper.INSTANCE::map)
-                .collect(Collectors.toSet());
+        Set<ProviderModel> newProviders = providers.stream().map(ProviderMapper.INSTANCE::map).collect(Collectors.toSet());
 
         // Filtrar los proveedores que no están en la base de datos y deben ser guardados
-        Set<ProviderModel> toAdd = newProviders.stream()
-                .filter(provider -> !contains(existingProviders, provider))
-                .collect(Collectors.toSet());
+        Set<ProviderModel> toAdd = newProviders.stream().filter(provider -> !contains(existingProviders, provider)).collect(Collectors.toSet());
 
         // Filtrar los proveedores que están en la base de datos pero no en el nuevo listado y deben ser eliminados
-        Set<ProviderModel> toRemove = existingProviders.stream()
-                .filter(provider -> !contains(newProviders, provider))
-                .collect(Collectors.toSet());
+        Set<ProviderModel> toRemove = existingProviders.stream().filter(provider -> !contains(newProviders, provider)).collect(Collectors.toSet());
 
         // Guardar los nuevos proveedores
         if (!toAdd.isEmpty()) {
@@ -341,17 +326,11 @@ public class TmdbService {
     }
 
     private boolean contains(Set<ProviderModel> providers, ProviderModel provider) {
-        return !providers.stream()
-                .filter(providerModel -> providerModel.getProviderId().equals(provider.getProviderId()))
-                .toList()
-                .isEmpty();
+        return !providers.stream().filter(providerModel -> providerModel.getProviderId().equals(provider.getProviderId())).toList().isEmpty();
     }
 
     public List<ProviderDto> getUserProviders() {
-        return StreamSupport
-                .stream(providerRepository.findAll().spliterator(), false)
-                .map(ProviderMapper.INSTANCE::map)
-                .collect(Collectors.toList());
+        return StreamSupport.stream(providerRepository.findAll().spliterator(), false).map(ProviderMapper.INSTANCE::map).collect(Collectors.toList());
     }
 
     /**
@@ -385,19 +364,17 @@ public class TmdbService {
 
     public List<ProviderDto> getMovieWatchProviders(Integer id) {
         WatchProviders watchProviders = getWatchProvidersByMovieId(id);
- 		return getProviders(watchProviders);
+        return getProviders(watchProviders);
     }
 
     private List<ProviderDto> getProviders(WatchProviders watchProviders) {
-        if (watchProviders.getResults().isEmpty())
-            return List.of();
-        else{
+        if (watchProviders.getResults().isEmpty()) return List.of();
+        else {
             var providers = watchProviders.getResults().get("ES");
-            if (providers == null)
-                return List.of();
+            if (providers == null) return List.of();
             else {
-                var result = ProviderMapper.INSTANCE.map(providers.getRent());
-                return result == null ? List.of(): result;
+                var result = ProviderMapper.INSTANCE.map(providers.getFlatrate());
+                return result == null ? List.of() : result;
             }
         }
     }
@@ -406,16 +383,54 @@ public class TmdbService {
      * Buscar películas o series por título.
      *
      * @param query Término de búsqueda.
-     * @param page Número de página para la paginación.
+     * @param page  Número de página para la paginación.
      * @return Resultados paginados de la búsqueda.
      */
     public PaginatedSearchResults search(String query, int page) {
-        String url = String.format("%s/search/multi?query=%s&language=es-ES&page=%d",
-                configuration.getApiUrl(), query, page);
+        String url = String.format("%s/search/multi?query=%s&language=es-ES&page=%d", configuration.getApiUrl(), query, page);
         logRequest("Search Movies/Series", url, Map.of("Query", query, "Page", page));
         return executeRequest(url, PaginatedSearchResults.class);
     }
 
+    public List<TorrentDto> getTorrentsForMovie(int movieId) {
+        return searchRepository.findByTmdbId(movieId)
+                .stream().findFirst()
+                .map(searchModel -> {
+                    return searchModel.getTorrents().stream().map(TorrentMapper.INSTANCE::mapToDto).collect(Collectors.toList());
+                }).orElseGet(() -> searchTorrents(movieId, "movie"));
+    }
+
+    public List<TorrentDto> getTorrentsForTvShow(int tvShowId, int season, int episode) {
+        return searchRepository.findByTmdbIdAndSeasonAndEpisode(tvShowId, season, episode)
+                .map(searchModel -> {
+                    return searchModel.getTorrents().stream().map(TorrentMapper.INSTANCE::mapToDto).collect(Collectors.toList());
+                }).orElseGet(() -> searchTorrents(tvShowId, "tv",  season, episode));
+    }
+
+    private @NotNull List<TorrentDto> searchTorrents(int id, String type, int ... args) {
+        return "movie".equals(type)
+                ? processMovie(id)
+                : processTvShow(id, args);
+    }
+
+    private List<TorrentDto> processTvShow(int id, int[] args) {
+        var tvShow = getTvShowDetail(id);
+        var externalIds = getTvShowExternalIds(id);
+        var title = tvShow.getName();
+        return searchService.searchSeries((String) externalIds.get("imdb_id"), tvShow.getId(), title, args[0], args[1])
+                .getTorrents()
+                .stream().map(TorrentMapper.INSTANCE::mapToDto)
+                .collect(Collectors.toList());
+    }
+
+    private List<TorrentDto> processMovie(int id) {
+        var movie = getMovieDetail(id);
+        var title = movie.getTitle();
+        return searchService.searchMovies(movie.getImdbId(), movie.getId(), title, movie.getReleaseDate())
+                .getTorrents()
+                .stream().map(TorrentMapper.INSTANCE::mapToDto)
+                .collect(Collectors.toList());
+    }
 
     @FunctionalInterface
     private interface ResponseProcessor<T, R> {

@@ -1,10 +1,10 @@
-package com.stremio.addon.service.tmdb.dto;
+package com.stremio.addon.controller.dto;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
-public class SearchResult {
+public class SearchDto {
     private Integer id;
     private String mediaType; // "movie" o "tv"
     private String title;
@@ -16,5 +16,4 @@ public class SearchResult {
     private String firstAirDate;
     @JsonProperty("poster_path")
     private String posterPath;
-
 }
